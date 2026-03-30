@@ -112,8 +112,10 @@ panel/.env
 productionapp/vMLX.app
 productionapp/*.dmg
 
-# Claude Code
-.claude/
+# Claude Code (settings/state stay local, skills are tracked)
+.claude/settings*
+.claude/todos*
+.claude/mcp.json
 
 # Old development artifacts (removed from main)
 examples/
