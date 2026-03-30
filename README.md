@@ -23,6 +23,8 @@
   <a href="https://ko-fi.com/jangml"><img src="https://img.shields.io/badge/Support-Ko--fi-FF5E5B?logo=ko-fi&logoColor=white" alt="Ko-fi" /></a>
 </p>
 
+> **Note:** This repository is a fork of [jjang-ai/vmlx](https://github.com/jjang-ai/vmlx). Original source code is used under the Apache 2.0 License.
+
 <p align="center">
   <a href="#quickstart">Quickstart</a> &bull;
   <a href="#model-support">Models</a> &bull;
@@ -518,8 +520,8 @@ vMLX includes a native macOS desktop app (MLX Studio) with 5 modes:
 Get the latest DMG from [MLX Studio Releases](https://github.com/jjang-ai/mlxstudio/releases/latest), or build from source:
 
 ```bash
-git clone https://github.com/jjang-ai/vmlx.git
-cd vmlx/panel
+git clone https://github.com/ASKKPOP/MLXstudio.git
+cd MLXstudio/panel
 npm install && npm run build
 npx electron-builder --mac dmg
 ```
@@ -700,8 +702,8 @@ pip install vmlx[image,jang]  # Multiple extras
 Contributions are welcome. Here is how to set up a development environment:
 
 ```bash
-git clone https://github.com/jjang-ai/vmlx.git
-cd vmlx
+git clone https://github.com/ASKKPOP/MLXstudio.git
+cd MLXstudio
 
 # Python engine
 python -m venv .venv && source .venv/bin/activate
@@ -717,7 +719,7 @@ npx vitest run                   # 1545+ tests
 ### Project Structure
 
 ```
-vmlx/
+MLXstudio/
   vmlx_engine/          # Python inference engine (FastAPI server)
   panel/                # Electron desktop app (React + TypeScript)
     src/main/           # Electron main process
@@ -743,8 +745,8 @@ Apache License 2.0 -- see [LICENSE](LICENSE).
 ---
 
 <p align="center">
-  Built by <a href="https://github.com/jjang-ai">Jinho Jang</a> (eric@jangq.ai)<br>
-  <a href="https://jangq.ai">JANGQ AI</a> &bull; <a href="https://pypi.org/project/vmlx/">PyPI</a> &bull; <a href="https://github.com/jjang-ai/vmlx">GitHub</a> &bull; <a href="https://github.com/jjang-ai/mlxstudio/releases">Downloads</a>
+  Original source by <a href="https://github.com/jjang-ai">Jinho Jang</a> (eric@jangq.ai) &bull; <a href="https://github.com/jjang-ai/vmlx">jjang-ai/vmlx</a><br>
+  This fork: <a href="https://github.com/ASKKPOP/MLXstudio">ASKKPOP/MLXstudio</a> &bull; <a href="https://pypi.org/project/vmlx/">PyPI</a> &bull; <a href="https://github.com/ASKKPOP/MLXstudio/releases">Downloads</a>
 </p>
 
 ---
