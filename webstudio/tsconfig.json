@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "jsx": "react-jsx",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "outDir": "dist-server",
+    "rootDir": ".",
+    "paths": {
+      "@renderer/*": ["../panel/src/renderer/src/*"]
+    }
+  },
+  "include": ["server/**/*", "src/**/*"],
+  "exclude": ["node_modules", "dist", "dist-server"]
+}
