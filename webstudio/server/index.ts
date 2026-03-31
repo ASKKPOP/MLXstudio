@@ -111,56 +111,53 @@ app.get('/api/engine/installers', (_req, res) => {
   res.json(installers)
 })
 
-// Stream engine installation via SSE
+// Fire-and-forget engine installation — logs and completion delivered via SSE.
+// Avoids Vite dev proxy buffering issues with long-running streaming POST responses.
 let installProc: ReturnType<typeof spawn> | null = null
 app.post('/api/engine/install', (req, res) => {
   const { method, path: installerPath } = req.body as { method: string; path: string }
 
-  res.setHeader('Content-Type', 'text/event-stream')
-  res.setHeader('Cache-Control', 'no-cache')
-  res.setHeader('Connection', 'keep-alive')
-  res.flushHeaders()
-
-  const send = (data: string) => {
-    try { res.write(`data: ${JSON.stringify({ data })}\n\n`) } catch { }
-    broadcaster.broadcast('engine:installLog', { data })
-  }
+  if (installProc) { res.status(409).json({ error: 'Install already in progress' }); return }
 
   let cmd: string, args: string[]
   if (method === 'uv') {
     cmd = installerPath
-    args = ['pip', 'install', 'vmlx']
+    args = ['tool', 'install', 'vmlx']
   } else {
     cmd = installerPath
     args = ['install', 'vmlx']
   }
 
-  send(`Installing vmlx engine using ${method}...\n`)
+  const sendLog = (data: string) => broadcaster.broadcast('engine:installLog', { data })
+
+  sendLog(`Installing vmlx using ${method}...\n`)
   installProc = spawn(cmd, args, { env: { ...process.env, PATH: `${homedir()}/.local/bin:${process.env.PATH}` } })
 
-  installProc.stdout?.on('data', (d) => send(d.toString()))
-  installProc.stderr?.on('data', (d) => send(d.toString()))
+  installProc.stdout?.on('data', (d) => sendLog(d.toString()))
+  installProc.stderr?.on('data', (d) => sendLog(d.toString()))
   installProc.on('close', (code) => {
     if (code === 0) {
-      send('\nInstallation complete!\n')
-      res.write(`data: ${JSON.stringify({ done: true, success: true })}\n\n`)
+      sendLog('\nInstallation complete!\n')
+      broadcaster.broadcast('engine:installDone', { success: true })
     } else {
-      res.write(`data: ${JSON.stringify({ done: true, success: false, error: `Process exited with code ${code}` })}\n\n`)
+      broadcaster.broadcast('engine:installDone', { success: false, error: `Process exited with code ${code}` })
     }
     installProc = null
-    res.end()
   })
   installProc.on('error', (err) => {
-    res.write(`data: ${JSON.stringify({ done: true, success: false, error: err.message })}\n\n`)
+    broadcaster.broadcast('engine:installDone', { success: false, error: err.message })
     installProc = null
-    res.end()
   })
-  req.on('close', () => { installProc?.kill() })
+
+  res.json({ ok: true })
 })
 
 app.post('/api/engine/install/cancel', (_req, res) => {
-  installProc?.kill()
-  installProc = null
+  if (installProc) {
+    installProc.kill()
+    installProc = null
+    broadcaster.broadcast('engine:installDone', { success: false, error: 'Cancelled' })
+  }
   res.json({ ok: true })
 })
 

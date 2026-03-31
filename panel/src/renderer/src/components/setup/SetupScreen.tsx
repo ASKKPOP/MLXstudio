@@ -1,5 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 
+function stripAnsi(str: string): string {
+  // eslint-disable-next-line no-control-regex
+  return str.replace(/\x1b\[[0-9;]*[mGKHF]/g, '')
+}
+
 interface AvailableInstaller {
   method: 'uv' | 'pip'
   path: string
@@ -17,10 +22,13 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
   const [installing, setInstalling] = useState(false)
   const [installError, setInstallError] = useState<string | null>(null)
   const [logs, setLogs] = useState<string[]>([])
+  const [progress, setProgress] = useState(0)
+  const [progressLabel, setProgressLabel] = useState('')
   const logEndRef = useRef<HTMLDivElement>(null)
   const mountedRef = useRef(true)
 
   useEffect(() => {
+    mountedRef.current = true // Reset on mount (StrictMode remounts without re-initializing refs)
     checkAndProceed()
     return () => { mountedRef.current = false }
   }, [])
@@ -52,6 +60,23 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
     }
   }
 
+  const updateProgress = (logLine: string) => {
+    const line = logLine.toLowerCase()
+    if (line.includes('downloading') || line.includes('fetching')) {
+      setProgress(prev => Math.max(prev, 20))
+      setProgressLabel('Downloading packages...')
+    } else if (line.includes('resolv') || line.includes('building')) {
+      setProgress(prev => Math.max(prev, 40))
+      setProgressLabel('Resolving dependencies...')
+    } else if (line.includes('install') && !line.includes('installing vmlx')) {
+      setProgress(prev => Math.max(prev, 65))
+      setProgressLabel('Installing packages...')
+    } else if (line.includes('installed') || line.includes('complete')) {
+      setProgress(prev => Math.max(prev, 90))
+      setProgressLabel('Finalizing...')
+    }
+  }
+
   const handleInstall = async () => {
     if (!selectedMethod || installing) return
 
@@ -61,9 +86,14 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
     setInstalling(true)
     setInstallError(null)
     setLogs([])
+    setProgress(5)
+    setProgressLabel('Starting installation...')
 
     const unsubLog = window.api.engine.onInstallLog((data: any) => {
-      if (mountedRef.current) setLogs(prev => [...prev.slice(-500), data.data])
+      if (mountedRef.current) {
+        setLogs(prev => [...prev.slice(-500), data.data])
+        updateProgress(data.data)
+      }
     })
 
     try {
@@ -76,17 +106,21 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
       if (!mountedRef.current) return
 
       if (result.success) {
+        setProgress(100)
+        setProgressLabel('Installation complete!')
         setLogs(prev => [...prev, '\nInference engine installed successfully!'])
         // Brief pause so user sees success, then proceed
         setTimeout(() => { if (mountedRef.current) onReady() }, 1000)
       } else {
         setInstallError(result.error || 'Installation failed')
         setInstalling(false)
+        setProgress(0)
       }
     } catch (error) {
       if (mountedRef.current) {
         setInstallError((error as Error).message)
         setInstalling(false)
+        setProgress(0)
       }
     } finally {
       unsubLog()
@@ -96,6 +130,8 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
   const handleCancel = async () => {
     await window.api.engine.cancelInstall()
     setInstalling(false)
+    setProgress(0)
+    setProgressLabel('')
     setLogs(prev => [...prev, '\nInstallation cancelled.'])
   }
 
@@ -120,14 +156,33 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
           </p>
         </div>
 
+        {/* Progress bar (shown while installing) */}
+        {installing && (
+          <div className="mb-4">
+            <div className="flex justify-between items-center mb-1.5">
+              <span className="text-xs text-muted-foreground">{progressLabel}</span>
+              <span className="text-xs text-muted-foreground">{progress}%</span>
+            </div>
+            <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
+              <div
+                className="h-full bg-primary rounded-full transition-all duration-500 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Install log (shown during/after install) */}
         {logs.length > 0 && (
           <div className="mb-4 bg-background/80 text-primary font-mono text-xs p-4 rounded-lg max-h-[40vh] overflow-auto border border-border">
-            {logs.map((line, i) => (
-              <div key={i} className={`whitespace-pre-wrap ${line.includes('ERROR') || line.includes('error') ? 'text-destructive' : ''}`}>
-                {line}
-              </div>
-            ))}
+            {logs.map((line, i) => {
+              const clean = stripAnsi(line)
+              return (
+                <div key={i} className={`whitespace-pre-wrap ${clean.includes('ERROR') || clean.includes('error') || clean.includes('×') ? 'text-destructive' : ''}`}>
+                  {clean}
+                </div>
+              )
+            })}
             {installing && <div className="animate-pulse">...</div>}
             <div ref={logEndRef} />
           </div>

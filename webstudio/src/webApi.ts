@@ -22,14 +22,8 @@ const _listeners = new Map<string, Set<(data: any) => void>>()
 function getSse(): EventSource {
   if (_sse) return _sse
   _sse = new EventSource(`${BASE}/api/events`)
-  _sse.onerror = () => {
-    // Reconnect after 3s if connection drops
-    setTimeout(() => { _sse = null; getSse() }, 3000)
-  }
-  _sse.addEventListener('message', (e) => {
-    // Generic message (shouldn't happen with named events)
-    console.debug('[SSE] message:', e.data)
-  })
+  // Let the browser's built-in EventSource reconnect handle drops automatically.
+  // Do NOT destroy and recreate _sse on error — that wipes all registered listeners.
   return _sse
 }
 
@@ -324,43 +318,21 @@ export const webApi = {
     checkEngineVersion: () => Promise.resolve({ upToDate: true }),
     installStreaming: (method: string, _action: string, installerPath?: string): Promise<{ success: boolean; error?: string }> => {
       return new Promise((resolve) => {
-        const es = new EventSource('/api/engine/install')
-        // We need POST, so use fetch + streaming instead
-        es.close()
+        // Subscribe to SSE completion event before starting the install
+        const unsubDone = sseOn('engine:installDone', (payload: any) => {
+          unsubDone()
+          resolve({ success: payload.success, error: payload.error })
+        })
 
-        // Use fetch with a ReadableStream to post and stream response
+        // POST to kick off the install (returns immediately; progress via SSE)
         fetch('/api/engine/install', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ method, path: installerPath }),
-        }).then(async (response) => {
-          if (!response.body) { resolve({ success: false, error: 'No response body' }); return }
-          const reader = response.body.getReader()
-          const decoder = new TextDecoder()
-          let buffer = ''
-          while (true) {
-            const { done, value } = await reader.read()
-            if (done) break
-            buffer += decoder.decode(value, { stream: true })
-            const lines = buffer.split('\n')
-            buffer = lines.pop() || ''
-            for (const line of lines) {
-              if (!line.startsWith('data: ')) continue
-              try {
-                const payload = JSON.parse(line.slice(6))
-                if (payload.data) {
-                  // Broadcast to any onInstallLog listeners
-                  installLogListeners.forEach(cb => cb({ data: payload.data }))
-                }
-                if (payload.done) {
-                  resolve({ success: payload.success, error: payload.error })
-                  return
-                }
-              } catch { }
-            }
-          }
-          resolve({ success: false, error: 'Stream ended unexpectedly' })
-        }).catch(err => resolve({ success: false, error: err.message }))
+        }).catch(err => {
+          unsubDone()
+          resolve({ success: false, error: err.message })
+        })
       })
     },
     cancelInstall: () => post('/api/engine/install/cancel', {}),
