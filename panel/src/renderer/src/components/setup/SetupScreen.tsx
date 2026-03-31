@@ -24,6 +24,7 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
   const [logs, setLogs] = useState<string[]>([])
   const [progress, setProgress] = useState(0)
   const [progressLabel, setProgressLabel] = useState('')
+  const platformErrorRef = useRef(false)
   const logEndRef = useRef<HTMLDivElement>(null)
   const mountedRef = useRef(true)
 
@@ -62,6 +63,10 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
 
   const updateProgress = (logLine: string) => {
     const line = logLine.toLowerCase()
+    // Detect platform incompatibility (e.g. mlx wheels only for arm64)
+    if (line.includes('unsatisfiable') || (line.includes('wheels are available') && !line.includes('x86_64'))) {
+      platformErrorRef.current = true
+    }
     if (line.includes('downloading') || line.includes('fetching')) {
       setProgress(prev => Math.max(prev, 20))
       setProgressLabel('Downloading packages...')
@@ -88,6 +93,7 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
     setLogs([])
     setProgress(5)
     setProgressLabel('Starting installation...')
+    platformErrorRef.current = false
 
     const unsubLog = window.api.engine.onInstallLog((data: any) => {
       if (mountedRef.current) {
@@ -112,13 +118,19 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
         // Brief pause so user sees success, then proceed
         setTimeout(() => { if (mountedRef.current) onReady() }, 1000)
       } else {
-        setInstallError(result.error || 'Installation failed')
+        const friendlyError = platformErrorRef.current
+          ? 'vMLX requires Apple Silicon (M1/M2/M3). MLX is not available for Intel Macs.'
+          : result.error || 'Installation failed'
+        setInstallError(friendlyError)
         setInstalling(false)
         setProgress(0)
       }
     } catch (error) {
       if (mountedRef.current) {
-        setInstallError((error as Error).message)
+        const friendlyError = platformErrorRef.current
+          ? 'vMLX requires Apple Silicon (M1/M2/M3). MLX is not available for Intel Macs.'
+          : (error as Error).message
+        setInstallError(friendlyError)
         setInstalling(false)
         setProgress(0)
       }
