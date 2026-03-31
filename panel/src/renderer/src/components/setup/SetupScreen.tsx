@@ -286,6 +286,18 @@ export function SetupScreen({ onReady }: SetupScreenProps) {
             </div>
           </div>
         )}
+
+        {/* Skip option — management mode without inference engine */}
+        {!installing && (
+          <div className="mt-6 text-center">
+            <button
+              onClick={onReady}
+              className="text-xs text-muted-foreground hover:text-foreground underline underline-offset-2"
+            >
+              Continue without engine (management only)
+            </button>
+          </div>
+        )}
       </div>
     </div>
   )
