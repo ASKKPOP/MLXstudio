@@ -366,6 +366,21 @@ export const webApi = {
     getModelPaths: () => Promise.resolve([]),
   },
 
+  // ── File System ─────────────────────────────────────────────────────────────
+  fs: {
+    tree: (dirPath?: string) => get('/api/fs/tree', dirPath ? { path: dirPath } : undefined),
+    readFile: (filePath: string) => get('/api/fs/file', { path: filePath }).then((r: any) => r.content as string),
+    writeFile: (filePath: string, content: string) => post('/api/fs/file', { path: filePath, content }),
+  },
+
+  // ── Terminal ─────────────────────────────────────────────────────────────
+  terminal: {
+    exec: (cmd: string, cwd?: string, sessionId?: string) =>
+      post('/api/terminal/exec', { cmd, cwd, sessionId }),
+    onOutput: (cb: (d: any) => void) => sseOn('terminal:output', cb),
+    onDone: (cb: (d: any) => void) => sseOn('terminal:done', cb),
+  },
+
   // ── Coding tools (not applicable in web mode) ────────────────────────────
   tools: {
     getCodingToolStatus: () => Promise.resolve([]),

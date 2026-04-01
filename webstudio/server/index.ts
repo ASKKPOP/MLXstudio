@@ -10,7 +10,8 @@ import express from 'express'
 import cors from 'cors'
 import { randomUUID } from 'crypto'
 import { existsSync } from 'fs'
-import { join } from 'path'
+import { readdir, readFile as fsReadFile, writeFile as fsWriteFile, stat } from 'fs/promises'
+import { join, resolve, extname } from 'path'
 import { execSync, spawn } from 'child_process'
 import { homedir } from 'os'
 import { broadcaster } from './events.js'
@@ -158,6 +159,90 @@ app.post('/api/engine/install/cancel', (_req, res) => {
     installProc = null
     broadcaster.broadcast('engine:installDone', { success: false, error: 'Cancelled' })
   }
+  res.json({ ok: true })
+})
+
+// ── File System ─────────────────────────────────────────────────────────────
+// Restrict access to the user's home directory for security.
+function isSafePath(p: string): boolean {
+  const resolved = resolve(p)
+  return resolved.startsWith(homedir()) || resolved === homedir()
+}
+
+app.get('/api/fs/tree', async (req, res) => {
+  const dirPath = (req.query.path as string) || homedir()
+  if (!isSafePath(dirPath)) { res.status(403).json({ error: 'Access denied' }); return }
+  try {
+    const entries = await readdir(dirPath, { withFileTypes: true })
+    const items = entries
+      .filter(e => !e.name.startsWith('.'))
+      .map(e => ({
+        name: e.name,
+        path: join(dirPath, e.name),
+        type: (e.isDirectory() ? 'dir' : 'file') as 'dir' | 'file',
+        ext: e.isFile() ? extname(e.name) : undefined,
+      }))
+      .sort((a, b) => {
+        if (a.type !== b.type) return a.type === 'dir' ? -1 : 1
+        return a.name.localeCompare(b.name)
+      })
+    res.json({ path: dirPath, parent: resolve(dirPath, '..'), items })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.get('/api/fs/file', async (req, res) => {
+  const filePath = req.query.path as string
+  if (!filePath || !isSafePath(filePath)) { res.status(403).json({ error: 'Access denied' }); return }
+  try {
+    const info = await stat(filePath)
+    if (info.size > 5 * 1024 * 1024) { res.status(413).json({ error: 'File too large (>5 MB)' }); return }
+    const content = await fsReadFile(filePath, 'utf-8')
+    res.json({ content })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+app.post('/api/fs/file', async (req, res) => {
+  const { path: filePath, content } = req.body as { path: string; content: string }
+  if (!filePath || !isSafePath(filePath)) { res.status(403).json({ error: 'Access denied' }); return }
+  try {
+    await fsWriteFile(filePath, content, 'utf-8')
+    res.json({ ok: true })
+  } catch (err: any) {
+    res.status(500).json({ error: err.message })
+  }
+})
+
+// ── Terminal ─────────────────────────────────────────────────────────────────
+app.post('/api/terminal/exec', (req, res) => {
+  const { cmd, cwd, sessionId = 'default' } = req.body as { cmd: string; cwd?: string; sessionId?: string }
+  if (!cmd?.trim()) { res.json({ ok: true }); return }
+
+  const workingDir = (cwd && existsSync(cwd)) ? cwd : homedir()
+  const sendOut = (data: string) => broadcaster.broadcast('terminal:output', { data, sessionId })
+  const sendDone = (code: number | null) => broadcaster.broadcast('terminal:done', { code, sessionId })
+
+  const proc = spawn('sh', ['-c', cmd], {
+    cwd: workingDir,
+    env: { ...process.env, PATH: `${homedir()}/.local/bin:${process.env.PATH}`, TERM: 'xterm-color' },
+  })
+
+  proc.stdout?.on('data', d => sendOut(d.toString()))
+  proc.stderr?.on('data', d => sendOut(d.toString()))
+  proc.on('close', code => sendDone(code))
+  proc.on('error', err => { sendOut(`Error: ${err.message}\n`); sendDone(null) })
+
+  // Auto-kill after 30 seconds
+  const timeout = setTimeout(() => {
+    proc.kill()
+    sendOut('\n[Timed out after 30 s]\n')
+    sendDone(null)
+  }, 30000)
+  proc.on('close', () => clearTimeout(timeout))
+
   res.json({ ok: true })
 })
 

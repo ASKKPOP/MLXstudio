@@ -49,9 +49,11 @@ interface ChatInterfaceProps {
   sessionId?: string
   sessionStatus?: string
   overridesVersion?: number
+  activeSessionId?: string | null
+  onSessionChange?: (sessionId: string) => void
 }
 
-export function ChatInterface({ chatId, onNewChat, sessionEndpoint, sessionId, sessionStatus, overridesVersion }: ChatInterfaceProps) {
+export function ChatInterface({ chatId, onNewChat, sessionEndpoint, sessionId, sessionStatus, overridesVersion, activeSessionId, onSessionChange }: ChatInterfaceProps) {
   const { showToast } = useToast()
   const [messages, setMessages] = useState<Message[]>([])
   // Track current chatId via ref so async handleSend can detect stale closures
@@ -515,6 +517,8 @@ export function ChatInterface({ chatId, onNewChat, sessionEndpoint, sessionId, s
         loading={loading}
         sessionEndpoint={sessionEndpoint}
         sessionId={sessionId}
+        activeSessionId={activeSessionId}
+        onSessionChange={onSessionChange}
       />
     </div>
   )

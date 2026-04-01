@@ -163,15 +163,13 @@ function App() {
         <UpdateNotice />
 
         <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar — chat mode only */}
-          {state.mode === 'chat' && (
-            <Sidebar
-              collapsed={state.sidebarCollapsed}
-              currentChatId={state.activeChatId}
-              onChatSelect={handleChatSelect}
-              onNewChat={handleNewChat}
-            />
-          )}
+          {/* Sidebar — always visible across all modes */}
+          <Sidebar
+            collapsed={state.sidebarCollapsed}
+            currentChatId={state.activeChatId}
+            onChatSelect={handleChatSelect}
+            onNewChat={handleNewChat}
+          />
 
           {/* Main content area */}
           <main className="flex-1 overflow-hidden">
@@ -239,10 +237,10 @@ function ChatModeContent({ activeChatId, sessionEndpoint, sessionStatus, activeS
 
   return (
     <div className="flex flex-col h-full relative">
+      {/* Slim server-controls toolbar (start/stop/settings) — model picker is in InputBox */}
       <ChatModeToolbar
         activeChatId={activeChatId}
         activeSessionId={activeSessionId}
-        onSessionChange={onSessionChange}
         onOverridesChanged={() => setOverridesVersion(v => v + 1)}
       />
       <div className="flex-1 overflow-hidden">
@@ -253,11 +251,14 @@ function ChatModeContent({ activeChatId, sessionEndpoint, sessionStatus, activeS
           sessionId={activeSessionId || undefined}
           sessionStatus={sessionStatus}
           overridesVersion={overridesVersion}
+          activeSessionId={activeSessionId}
+          onSessionChange={onSessionChange}
         />
       </div>
     </div>
   )
 }
+
 
 // MLX Studio — eric@mlx.studio
 function ChatEmptyState({ onNewChat }: { onNewChat: () => void }) {

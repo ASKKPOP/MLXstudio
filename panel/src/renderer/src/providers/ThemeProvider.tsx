@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react'
 
-type Theme = 'dark' | 'light' | 'system'
+type Theme = 'dark' | 'light' | 'system' | 'claude'
 type ResolvedTheme = 'dark' | 'light'
 
 interface ThemeContextValue {
@@ -25,7 +25,14 @@ function getSystemTheme(): ResolvedTheme {
 }
 
 function resolveTheme(theme: Theme): ResolvedTheme {
+  if (theme === 'claude') return 'light'
   return theme === 'system' ? getSystemTheme() : theme
+}
+
+/** Maps a Theme to the CSS class applied to <html> */
+function themeClass(theme: Theme, resolved: ResolvedTheme): string {
+  if (theme === 'claude') return 'claude'
+  return resolved
 }
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
@@ -46,15 +53,15 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setResolvedTheme(resolved)
 
     const root = document.documentElement
-    root.classList.remove('dark', 'light')
-    root.classList.add(resolved)
+    root.classList.remove('dark', 'light', 'claude')
+    root.classList.add(themeClass(theme, resolved))
 
     if (theme === 'system') {
       const mql = window.matchMedia('(prefers-color-scheme: dark)')
       const handler = () => {
         const newResolved = getSystemTheme()
         setResolvedTheme(newResolved)
-        root.classList.remove('dark', 'light')
+        root.classList.remove('dark', 'light', 'claude')
         root.classList.add(newResolved)
       }
       mql.addEventListener('change', handler)
